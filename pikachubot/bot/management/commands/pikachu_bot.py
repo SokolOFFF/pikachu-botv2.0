@@ -29,11 +29,11 @@ class Command(BaseCommand):
 
             if message.text == "/help":
                 bot.send_sticker(message.chat.id, sticker=SECRETS.help_sticker)
-                bot.send_message(message.chat.id, text="i can help you with a lot of things! type '/commands' to see all commands or use telegram interface to get it!\n\na little bit about some commands:\n/get_random_photo - choose the theme and i will send you a random picture on this theme!\n/game - choose the game and get luck!\n/weather - choose the type of using and send data (city name should be real and can be on any language)\n/schedule - use butons to navigate (for adding new schedule save schedule in CSV format)\n/save_location - send location and name to save it!\n/favourite_location - choose one of your fav locations and i will remind you where is it!\n\nsome of commands can be aborted by typing /exit")
+                bot.send_message(message.chat.id, text="i can help you with a lot of things! type '/commands' to see all commands or use telegram interface to get it!\n\na little bit about some commands:\n/get_random_photo - choose the theme and i will send you a random picture on this theme!\n/game - choose the game and get luck!\n/weather - choose the type of using and send data (city name should be real and can be on any language)\n/schedule - use butons to navigate (for adding new schedule save schedule in CSV format)\n/manage_locations - manage your fav locations: send location and name to save it, edit or delete!\n/favourite_locations - choose one of your fav locations and i will remind you where is it!\n\nsome of commands can be aborted by typing /exit")
 
         @bot.message_handler(content_types=['text'], commands=['commands'])
         def handle_commands(message):
-            commands = ['🥺 /help', '🔧 /login', '🖼 /add_photo', '🪩 /get_random_photo', '📂 /manage_themes', '🎮 /game', '⛅ /weather', '🗓 /schedule', '🗺 /save_location', '🏖 /favourite_location' ]
+            commands = ['🥺 /help', '🔧 /login', '🖼 /add_photo', '🪩 /get_random_photo', '📂 /manage_themes', '🎮 /game', '⛅ /weather', '🗓 /schedule', '🗺 /manage_locations', '🏖 /favourite_locations' ]
             text = 'here are all commands: \n'
             for command in commands:
                 text = text + f'{command}\n'
@@ -395,8 +395,20 @@ class Command(BaseCommand):
                 bot.reply_to(message, "sorry, gotcha problems :(")
                 print(e)
 
-        @bot.message_handler(content_types=['text'], commands=['save_location'])
-        def handle_save_location(message):
+        @bot.message_handler(content_types=['text'], commands=['manage_locations'])
+        def handle_manage_locations(message):
+            try:
+                markup = types.InlineKeyboardMarkup()
+                markup.add(types.InlineKeyboardButton(text='✅ add location', callback_data='add_location'))
+                markup.add(types.InlineKeyboardButton(text='🚫 delete location', callback_data='delete_location'))
+                markup.add(types.InlineKeyboardButton(text='✍ edit location name', callback_data='edit_location'))
+                bot.send_message(message.chat.id, text='okay! choose the option!', reply_markup=markup)
+
+            except Exception as e:
+                bot.reply_to(message, "sorry, gotcha problems :(")
+                print(e)
+
+        def save_location(message):
             try:
                 keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
                 button_geo = types.KeyboardButton(text="send location!", request_location=True)
@@ -427,6 +439,15 @@ class Command(BaseCommand):
                     bot.send_message(message.chat.id, text='okay :<')
 
                 name = message.text
+                if name.count('_') > 0:
+                    msg = bot.send_message(message.chat.id, text='sorry.. name cant have "_".. try again!')
+                    bot.register_next_step_handler(msg, receive_location_name, longitude, latitude)
+                    return
+                if len(name) > 15:
+                    msg = bot.send_message(message.chat.id, text='sorry.. name is too big.. try again!')
+                    bot.register_next_step_handler(msg, receive_location_name, longitude, latitude)
+                    return
+                name = name.replace(' ', '+')
                 user = User.objects.get(telegram_id=message.chat.id)
                 new_fav_location = FavLocation(name=name, user_id=user.id, longitude=longitude, latitude=latitude)
                 new_fav_location.save()
@@ -435,8 +456,7 @@ class Command(BaseCommand):
                 bot.reply_to(message, "sorry, gotcha problems :(")
                 print(e)
 
-        @bot.message_handler(content_types=['text'], commands=['favourite_location'])
-        def handle_favourite_location(message):
+        def delete_location(message):
             try:
                 markup = types.InlineKeyboardMarkup(row_width=1)
                 user = User.objects.get(telegram_id=message.chat.id)
@@ -445,7 +465,23 @@ class Command(BaseCommand):
                     bot.send_message(message.chat.id, text='you didnt add any location yet :<')
                     return
                 for location in fav_locations:
-                    markup.add(types.InlineKeyboardButton(text=f'{location.name}', callback_data=f'get_fav_location_{location.name}_by_{user.id}'))
+                    markup.add(types.InlineKeyboardButton(text=f'{location.name.replace("+", " ")}', callback_data=f'delete_fav_location_{location.name}_by_{user.id}'))
+                bot.send_message(message.chat.id, text='here are all your locations! choose one to delete', reply_markup=markup)
+            except Exception as e:
+                bot.reply_to(message, "sorry, gotcha problems :(")
+                print(e)
+
+        @bot.message_handler(content_types=['text'], commands=['favourite_locations'])
+        def handle_favourite_locations(message):
+            try:
+                markup = types.InlineKeyboardMarkup(row_width=1)
+                user = User.objects.get(telegram_id=message.chat.id)
+                fav_locations = FavLocation.objects.filter(user_id=user.id)
+                if len(fav_locations) == 0:
+                    bot.send_message(message.chat.id, text='you didnt add any location yet :<')
+                    return
+                for location in fav_locations:
+                    markup.add(types.InlineKeyboardButton(text=f'{location.name.replace("+", " ")}', callback_data=f'get_fav_location_{location.name}_by_{user.id}'))
                 bot.send_message(message.chat.id, text='here are all your locations!', reply_markup=markup)
             except Exception as e:
                 bot.reply_to(message, "sorry, gotcha problems :(")
@@ -455,12 +491,32 @@ class Command(BaseCommand):
         def callback_query(call):
             req = call.data
 
+            if req == 'add_location':
+                bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+                save_location(call.message)
+
+            if req == 'delete_location':
+                bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+                delete_location(call.message)
+
+            if req.count('delete_fav_location_') == 1:
+                try:
+                    bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+                    name = req.split('_')[3]
+                    user_id = req.split('_')[5]
+                    location = FavLocation.objects.filter(user_id=user_id).get(name=name.replace(' ', '+'))
+                    location.delete()
+                    bot.send_message(call.message.chat.id, text=f'your fav location <b>{name.replace("+", " ")}</b> deleted :(', parse_mode='html')
+                except Exception as e:
+                    bot.reply_to(call.message, "sorry, gotcha problems :(")
+                    print(e)
+
             if req.count('get_fav_location_') == 1:
                 try:
                     name = req.split('_')[3]
                     user_id = req.split('_')[5]
-                    location = FavLocation.objects.filter(user_id=user_id).get(name=name)
-                    bot.send_message(call.message.chat.id, text=f'your fav location <b>{name}</b>!', parse_mode='html')
+                    location = FavLocation.objects.filter(user_id=user_id).get(name=name.replace(" ", "+"))
+                    bot.send_message(call.message.chat.id, text=f'your fav location <b>{name.replace("+", " ")}</b>!', parse_mode='html')
                     bot.send_location(call.message.chat.id, latitude=location.latitude, longitude=location.longitude)
                 except Exception as e:
                     bot.reply_to(call.message, "sorry, gotcha problems :(")
