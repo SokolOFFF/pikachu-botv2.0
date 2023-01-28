@@ -465,12 +465,40 @@ class Command(BaseCommand):
                     bot.send_message(message.chat.id, text='you didnt add any location yet :<')
                     return
                 for location in fav_locations:
-                    markup.add(types.InlineKeyboardButton(text=f'{location.name.replace("+", " ")}', callback_data=f'delete_fav_location_{location.name}_by_{user.id}'))
+                    markup.add(types.InlineKeyboardButton(text=f'{location.name.replace("+", " ")}', callback_data=f'delete_fav_location_{location.id}_by_{user.id}'))
                 bot.send_message(message.chat.id, text='here are all your locations! choose one to delete', reply_markup=markup)
             except Exception as e:
                 bot.reply_to(message, "sorry, gotcha problems :(")
                 print(e)
 
+        def edit_location(message):
+            try:
+                markup = types.InlineKeyboardMarkup(row_width=1)
+                user = User.objects.get(telegram_id=message.chat.id)
+                fav_locations = FavLocation.objects.filter(user_id=user.id)
+                if len(fav_locations) == 0:
+                    bot.send_message(message.chat.id, text='you didnt add any location yet :<')
+                    return
+                for location in fav_locations:
+                    markup.add(types.InlineKeyboardButton(text=f'{location.name.replace("+", " ")}', callback_data=f'rename_location_{location.id}_by_{user.id}'))
+                bot.send_message(message.chat.id, text='here are all your locations! choose one to edit', reply_markup=markup)
+            except Exception as e:
+                bot.reply_to(message, "sorry, gotcha problems :(")
+                print(e)
+
+        def get_new_location_name(message, location):
+            try:
+                if message.text == '/exit':
+                    bot.send_message(message.chat.id, text='aight!')
+                    return
+                new_name = message.text
+                last_name = location.name
+                location.name = new_name
+                location.save()
+                bot.send_message(message.chat.id, text=f"success! your location <b>{last_name}</b> was renamed to <b>{new_name}</b>!", parse_mode='html')
+            except Exception as e:
+                bot.reply_to(message, "sorry, gotcha problems :(")
+                print(e)
         @bot.message_handler(content_types=['text'], commands=['favourite_locations'])
         def handle_favourite_locations(message):
             try:
@@ -481,7 +509,7 @@ class Command(BaseCommand):
                     bot.send_message(message.chat.id, text='you didnt add any location yet :<')
                     return
                 for location in fav_locations:
-                    markup.add(types.InlineKeyboardButton(text=f'{location.name.replace("+", " ")}', callback_data=f'get_fav_location_{location.name}_by_{user.id}'))
+                    markup.add(types.InlineKeyboardButton(text=f'{location.name.replace("+", " ")}', callback_data=f'get_fav_location_{location.id}_by_{user.id}'))
                 bot.send_message(message.chat.id, text='here are all your locations!', reply_markup=markup)
             except Exception as e:
                 bot.reply_to(message, "sorry, gotcha problems :(")
@@ -491,6 +519,10 @@ class Command(BaseCommand):
         def callback_query(call):
             req = call.data
 
+            if req == 'edit_location':
+                bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+                edit_location(call.message)
+
             if req == 'add_location':
                 bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
                 save_location(call.message)
@@ -499,24 +531,38 @@ class Command(BaseCommand):
                 bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
                 delete_location(call.message)
 
+            if req.count('rename_location_') == 1:
+                try:
+                    bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+                    location_id = req.split('_')[2]
+                    user_id = req.split('_')[4]
+                    location = FavLocation.objects.filter(user_id=user_id).get(id=location_id)
+                    msg = bot.send_message(call.message.chat.id, text=f'okay! now type new name!', parse_mode='html')
+                    bot.register_next_step_handler(msg, get_new_location_name, location)
+
+                except Exception as e:
+                    bot.reply_to(call.message, "sorry, gotcha problems :(")
+                    print(e)
+
             if req.count('delete_fav_location_') == 1:
                 try:
                     bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-                    name = req.split('_')[3]
+                    location_id = req.split('_')[3]
                     user_id = req.split('_')[5]
-                    location = FavLocation.objects.filter(user_id=user_id).get(name=name.replace(' ', '+'))
+                    location = FavLocation.objects.filter(user_id=user_id).get(id=location_id)
                     location.delete()
-                    bot.send_message(call.message.chat.id, text=f'your fav location <b>{name.replace("+", " ")}</b> deleted :(', parse_mode='html')
+                    bot.send_message(call.message.chat.id, text=f'your fav location <b>{location.name.replace("+", " ")}</b> deleted :(', parse_mode='html')
                 except Exception as e:
                     bot.reply_to(call.message, "sorry, gotcha problems :(")
                     print(e)
 
             if req.count('get_fav_location_') == 1:
                 try:
-                    name = req.split('_')[3]
+                    bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+                    location_id = req.split('_')[3]
                     user_id = req.split('_')[5]
-                    location = FavLocation.objects.filter(user_id=user_id).get(name=name.replace(" ", "+"))
-                    bot.send_message(call.message.chat.id, text=f'your fav location <b>{name.replace("+", " ")}</b>!', parse_mode='html')
+                    location = FavLocation.objects.filter(user_id=user_id).get(id=location_id)
+                    bot.send_message(call.message.chat.id, text=f'your fav location <b>{location.name.replace("+", " ")}</b>!', parse_mode='html')
                     bot.send_location(call.message.chat.id, latitude=location.latitude, longitude=location.longitude)
                 except Exception as e:
                     bot.reply_to(call.message, "sorry, gotcha problems :(")
