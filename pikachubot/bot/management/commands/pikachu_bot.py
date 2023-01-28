@@ -615,6 +615,7 @@ class Command(BaseCommand):
                 bot.send_message(call.message.chat.id, text='okay :< choose theme then....', reply_markup=markup)
 
             if req == 'cancel_deleting':
+                bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
                 bot.send_message(call.message.chat.id, text='hoooray! a theme survived!!')
 
             if req == 'get_weather_city':
