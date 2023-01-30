@@ -292,9 +292,9 @@ class Command(BaseCommand):
         def get_date_emojis(type):
             day = ''
             if type == 'today':
-                day = datetime.date.today().day
+                day = datetime.datetime.now().day
             if type == 'tomorrow':
-                day = (datetime.date.today() + datetime.timedelta(1)).day
+                day = (datetime.datetime.now() + datetime.timedelta(1)).day
             if day < 10:
                 day = f'0{day}'
             day = f'{day}'
@@ -586,18 +586,18 @@ class Command(BaseCommand):
                 bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
                 msg = bot.send_message(call.message.chat.id, text="here is your schedule for today!")
                 markup = schedule_markup
-                day_schedule(msg, day = datetime.date.today().weekday(), markup=markup)
+                day_schedule(msg, day = datetime.datetime.now().weekday(), markup=markup)
 
             if req == 'schedule_tomorrow':
                 bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
                 msg = bot.send_message(call.message.chat.id, text="here is your schedule for tomorrow!")
                 markup = schedule_markup
-                day_schedule(msg, day=(datetime.date.today() + datetime.timedelta(1)).weekday(), markup=markup)
+                day_schedule(msg, day=(datetime.datetime.now() + datetime.timedelta(1)).weekday(), markup=markup)
 
             if req == 'schedule_week':
                 bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
                 markup = week_markup
-                day_schedule(call.message, day = datetime.date.today().weekday(), markup=markup)
+                day_schedule(call.message, day = datetime.datetime.now().weekday(), markup=markup)
 
             if req == 'add_theme':
                 bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
