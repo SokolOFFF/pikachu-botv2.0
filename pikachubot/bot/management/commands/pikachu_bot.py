@@ -25,7 +25,7 @@ class Command(BaseCommand):
                 bot.send_message(message.chat.id,
                                  text="hi, {0.first_name}!\ni'm <b>{1.first_name}</b>, and i'm <b>Picture Bot</b> (but i have some other features). \ni hope i can help you somehow. ❤️".format(
                                      message.from_user, bot.get_me()), parse_mode='HTML')
-                user = User.objects.get_or_create(telegram_id=message.chat.id)
+                user = User.objects.get_or_create(telegram_id=message.chat.id, first_name=message.from_user.first_name, last_name=message.from_user.last_name)
 
             if message.text == "/help":
                 bot.send_sticker(message.chat.id, sticker=SECRETS.help_sticker)
@@ -33,7 +33,7 @@ class Command(BaseCommand):
 
         @bot.message_handler(content_types=['text'], commands=['commands'])
         def handle_commands(message):
-            commands = ['🥺 /help', '🔧 /login', '🖼 /add_photo', '🪩 /get_random_photo', '📂 /manage_themes', '🎮 /game', '⛅ /weather', '🗓 /schedule', '🗺 /manage_locations', '🏖 /favourite_locations' ]
+            commands = ['🥺 /help', '🔧 /login', '👤 /show_users', '💳 /id', '🖼 /add_photo', '🪩 /get_random_photo', '📂 /manage_themes', '🎮 /game', '⛅ /weather', '🗓 /schedule', '🗺 /manage_locations', '🏖 /favourite_locations' ]
             text = 'here are all commands: \n'
             for command in commands:
                 text = text + f'{command}\n'
@@ -280,14 +280,6 @@ class Command(BaseCommand):
             except Exception as e:
                 bot.reply_to(message, "sorry, gotcha problems :(")
 
-        @bot.message_handler(content_types=['text'], commands=['schedule'])
-        def handle_schedule(message):
-            try:
-                markup = schedule_markup
-                bot.send_message(message.chat.id, text='well, what you looking for?', reply_markup=markup)
-            except Exception as e:
-                bot.reply_to(message, "sorry, gotcha problems :(")
-                print(e)
 
         def get_date_emojis(type):
             day = ''
@@ -303,13 +295,25 @@ class Command(BaseCommand):
                 return_emojis = return_emojis + config.emojis[number]
             return return_emojis
 
-        schedule_markup = types.InlineKeyboardMarkup(row_width=1)
-        schedule_markup.row(types.InlineKeyboardButton(text=f'today {get_date_emojis("today")}',
-                                                       callback_data='schedule_today'),
-                            types.InlineKeyboardButton(text=f'tomorrow {get_date_emojis("tomorrow")}',
-                                                       callback_data='schedule_tomorrow'))
-        schedule_markup.row(types.InlineKeyboardButton(text='add new schedule 📝', callback_data='add_new_schedule'),
-                            types.InlineKeyboardButton(text='week 📆', callback_data='schedule_week'))
+        def make_schedule_markup():
+            schedule_markup = types.InlineKeyboardMarkup(row_width=1)
+            schedule_markup.row(types.InlineKeyboardButton(text=f'today {get_date_emojis("today")}',
+                                                           callback_data='schedule_today'),
+                                types.InlineKeyboardButton(text=f'tomorrow {get_date_emojis("tomorrow")}',
+                                                           callback_data='schedule_tomorrow'))
+            schedule_markup.row(types.InlineKeyboardButton(text='add new schedule 📝', callback_data='add_new_schedule'),
+                                types.InlineKeyboardButton(text='week 📆', callback_data='schedule_week'))
+            return schedule_markup
+
+        @bot.message_handler(content_types=['text'], commands=['schedule'])
+        def handle_schedule(message):
+            try:
+
+                markup = make_schedule_markup()
+                bot.send_message(message.chat.id, text='well, what you looking for?', reply_markup=markup)
+            except Exception as e:
+                bot.reply_to(message, "sorry, gotcha problems :(")
+                print(e)
 
         week_markup = types.InlineKeyboardMarkup(row_width=1)
         week_markup.row(types.InlineKeyboardButton(text='monday', callback_data='week_schedule_monday'),
@@ -515,6 +519,30 @@ class Command(BaseCommand):
                 bot.reply_to(message, "sorry, gotcha problems :(")
                 print(e)
 
+        @bot.message_handler(content_types=['text'], commands=['show_users'])
+        def handle_show_users(message):
+            try:
+                user = User.objects.get(telegram_id=message.chat.id)
+                if user.is_logged:
+                    users = User.objects.all()
+                    msg = ''
+                    for local_user in users:
+                        msg = msg + f"{local_user.first_name} {local_user.last_name} (tg id: {local_user.telegram_id}, logged in: {local_user.is_logged})\n"
+                    bot.send_message(message.chat.id, text=msg)
+                else:
+                    bot.send_message(message.chat.id, text="sry, bro, you don't have access :<")
+            except Exception as e:
+                bot.reply_to(message, "sorry, gotcha problems :(")
+                print(e)
+
+        @bot.message_handler(content_types=['text'], commands=['id'])
+        def handle_id(message):
+            try:
+                bot.send_message(message.chat.id, text=f"your tg id: {message.chat.id}")
+            except Exception as e:
+                bot.reply_to(message, "sorry, gotcha problems :(")
+                print(e)
+
         @bot.callback_query_handler(func=lambda call: True)
         def callback_query(call):
             req = call.data
@@ -585,13 +613,13 @@ class Command(BaseCommand):
             if req == 'schedule_today':
                 bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
                 msg = bot.send_message(call.message.chat.id, text="here is your schedule for today!")
-                markup = schedule_markup
+                markup = make_schedule_markup()
                 day_schedule(msg, day = datetime.datetime.now().weekday(), markup=markup)
 
             if req == 'schedule_tomorrow':
                 bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
                 msg = bot.send_message(call.message.chat.id, text="here is your schedule for tomorrow!")
-                markup = schedule_markup
+                markup = make_schedule_markup()
                 day_schedule(msg, day=(datetime.datetime.now() + datetime.timedelta(1)).weekday(), markup=markup)
 
             if req == 'schedule_week':
