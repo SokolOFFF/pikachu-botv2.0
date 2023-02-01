@@ -14,6 +14,8 @@ class LinkToPicture(models.Model):
 
 class User(models.Model):
     telegram_id = models.CharField(max_length=20)
+    first_name = models.CharField(max_length=200, default='')
+    last_name = models.CharField(max_length=200, default='')
     is_logged = models.BooleanField(default=False)
 
 
