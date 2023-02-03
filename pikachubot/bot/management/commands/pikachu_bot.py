@@ -414,6 +414,11 @@ class Command(BaseCommand):
 
         def save_location(message):
             try:
+                user = User.objects.get(telegram_id=message.chat.id)
+                locations = FavLocation.objects.filter(user_id=user.id)
+                if len(locations) >= config.MAX_LOCATION_CAPACITY:
+                    bot.send_message(message.chat.id, text='sorry, mate, too much locations :<')
+                    return 
                 keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
                 button_geo = types.KeyboardButton(text="send location!", request_location=True)
                 keyboard.add(button_geo)
@@ -447,7 +452,7 @@ class Command(BaseCommand):
                     msg = bot.send_message(message.chat.id, text='sorry.. name cant have "_".. try again!')
                     bot.register_next_step_handler(msg, receive_location_name, longitude, latitude)
                     return
-                if len(name) > 15:
+                if len(name) > config.MAX_NAME_LENGTH:
                     msg = bot.send_message(message.chat.id, text='sorry.. name is too big.. try again!')
                     bot.register_next_step_handler(msg, receive_location_name, longitude, latitude)
                     return
@@ -528,7 +533,13 @@ class Command(BaseCommand):
                     msg = ''
                     for local_user in users:
                         msg = msg + f"{local_user.first_name} {local_user.last_name} (tg id: {local_user.telegram_id}, logged in: {local_user.is_logged})\n"
-                    bot.send_message(message.chat.id, text=msg)
+                        fav_locations = FavLocation.objects.filter(user_id=local_user.id)
+                        msg = msg + f'num of fav location: {len(fav_locations)}\n'
+                        for location in fav_locations:
+                            msg = msg + f'   name: <b>{location.name}</b>, long: {location.longitude}, lat: {location.latitude}\n'
+                        schedule = Schedule.objects.filter(user_id=local_user.id)
+                        msg = msg + f"num of schedule fields: {len(schedule)}\n\n"
+                    bot.send_message(message.chat.id, text=msg, parse_mode='html')
                 else:
                     bot.send_message(message.chat.id, text="sry, bro, you don't have access :<")
             except Exception as e:
