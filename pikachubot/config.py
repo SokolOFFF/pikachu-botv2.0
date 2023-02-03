@@ -30,3 +30,6 @@ day_of_week_to_num = {
     'saturday' : '5',
     'sunday' : '6'
 }
+
+MAX_LOCATION_CAPACITY = 10
+MAX_NAME_LENGTH = 20
