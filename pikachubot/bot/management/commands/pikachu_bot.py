@@ -18,6 +18,13 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         bot = telebot.TeleBot(SECRETS.BOT_TOKEN)
 
+        def check_user(message):
+            user = User.objects.filter(telegram_id=message.chat.id)
+            if user:
+                return 1
+            else:
+                bot.send_message(message.chat.id, text='please, text /start to use bot')
+                return 0
         @bot.message_handler(content_types=['text'], commands=['start', 'help'])
         def handle_start_help(message):
             if message.text == "/start":
@@ -37,26 +44,29 @@ class Command(BaseCommand):
                 user = User.objects.get_or_create(telegram_id=message.chat.id, first_name=first_name, last_name=last_name)
 
             if message.text == "/help":
-                bot.send_sticker(message.chat.id, sticker=SECRETS.help_sticker)
-                bot.send_message(message.chat.id, text="i can help you with a lot of things! type '/commands' to see all commands or use telegram interface to get it!\n\na little bit about some commands:\n/get_random_photo - choose the theme and i will send you a random picture on this theme!\n/game - choose the game and get luck!\n/weather - choose the type of using and send data (city name should be real and can be on any language)\n/schedule - use butons to navigate (for adding new schedule save schedule in CSV format)\n/manage_locations - manage your fav locations: send location and name to save it, edit or delete!\n/favourite_locations - choose one of your fav locations and i will remind you where is it!\n\nsome of commands can be aborted by typing /exit")
+                if check_user(message):
+                    bot.send_sticker(message.chat.id, sticker=SECRETS.help_sticker)
+                    bot.send_message(message.chat.id, text="i can help you with a lot of things! type '/commands' to see all commands or use telegram interface to get it!\n\na little bit about some commands:\n/get_random_photo - choose the theme and i will send you a random picture on this theme!\n/game - choose the game and get luck!\n/weather - choose the type of using and send data (city name should be real and can be on any language)\n/schedule - use butons to navigate (for adding new schedule save schedule in CSV format)\n/manage_locations - manage your fav locations: send location and name to save it, edit or delete!\n/favourite_locations - choose one of your fav locations and i will remind you where is it!\n\nsome of commands can be aborted by typing /exit")
 
         @bot.message_handler(content_types=['text'], commands=['commands'])
         def handle_commands(message):
-            commands = ['🥺 /help', '🔧 /login', '👤 /show_users', '💳 /id', '🖼 /add_photo', '🪩 /get_random_photo', '📂 /manage_themes', '🎮 /game', '⛅ /weather', '🗓 /schedule', '🗺 /manage_locations', '🏖 /favourite_locations' ]
-            text = 'here are all commands: \n'
-            for command in commands:
-                text = text + f'{command}\n'
-            bot.send_message(message.chat.id, text=text)
+            if check_user(message):
+                commands = ['🥺 /help', '🔧 /login', '👤 /show_users', '💳 /id', '🖼 /add_photo', '🪩 /get_random_photo', '📂 /manage_themes', '🎮 /game', '⛅ /weather', '🗓 /schedule', '🗺 /manage_locations', '🏖 /favourite_locations' ]
+                text = 'here are all commands: \n'
+                for command in commands:
+                    text = text + f'{command}\n'
+                bot.send_message(message.chat.id, text=text)
 
         @bot.message_handler(content_types=['text'], commands=['login'])
         def handle_login(message):
-            user = User.objects.get(telegram_id=message.chat.id)
-            if user.is_logged == 1:
-                bot.send_message(message.chat.id, text="you don't need it! you already logged in!")
+            if check_user(message):
+                user = User.objects.get(telegram_id=message.chat.id)
+                if user.is_logged == 1:
+                    bot.send_message(message.chat.id, text="you don't need it! you already logged in!")
 
-            else:
-                msg = bot.send_message(message.chat.id, text="type the password!")
-                bot.register_next_step_handler(msg, check_password)
+                else:
+                    msg = bot.send_message(message.chat.id, text="type the password!")
+                    bot.register_next_step_handler(msg, check_password)
 
         def check_password(message):
             try:
@@ -77,16 +87,20 @@ class Command(BaseCommand):
 
         @bot.message_handler(content_types=['text'], commands=['add_photo'])
         def handle_add_photo(message):
-            user = User.objects.get(telegram_id=message.chat.id)
-            if user.is_logged == 0:
-                bot.send_message(message.chat.id, text="sorry, you can't do this :(")
+            if check_user(message):
+                try:
+                    user = User.objects.get(telegram_id=message.chat.id)
+                    if user.is_logged == 0:
+                        bot.send_message(message.chat.id, text="sorry, you can't do this :(")
 
-            else:
-                markup = types.InlineKeyboardMarkup()
-                themes = Theme.objects.all()
-                for theme in themes:
-                    markup.add(types.InlineKeyboardButton(text=theme.name, callback_data=theme.short_name + "_add_photo"))
-                msg = bot.send_message(message.chat.id, text='aight! choose theme!', reply_markup=markup)
+                    else:
+                        markup = types.InlineKeyboardMarkup()
+                        themes = Theme.objects.all()
+                        for theme in themes:
+                            markup.add(types.InlineKeyboardButton(text=theme.name, callback_data=theme.short_name + "_add_photo"))
+                        msg = bot.send_message(message.chat.id, text='aight! choose theme!', reply_markup=markup)
+                except Exception as e:
+                    bot.reply_to(message, text="sorry, gotcha problems :(")
 
         def receive_photo(message, short_theme):
             try:
@@ -112,16 +126,17 @@ class Command(BaseCommand):
 
         @bot.message_handler(content_types=['text'], commands=['get_random_photo'])
         def handle_get_random_photo(message):
-            try:
-                markup = types.InlineKeyboardMarkup()
-                themes = Theme.objects.all()
-                for theme in themes:
-                    markup.add(types.InlineKeyboardButton(text=theme.name, callback_data=theme.short_name + "_get_photo"))
-                bot.send_message(message.chat.id, "okay, choose theme!", reply_markup=markup)
+            if check_user(message):
+                try:
+                    markup = types.InlineKeyboardMarkup()
+                    themes = Theme.objects.all()
+                    for theme in themes:
+                        markup.add(types.InlineKeyboardButton(text=theme.name, callback_data=theme.short_name + "_get_photo"))
+                    bot.send_message(message.chat.id, "okay, choose theme!", reply_markup=markup)
 
-            except Exception as e:
-                bot.reply_to(message, "sorry, gotcha problems :(")
-                print(e)
+                except Exception as e:
+                    bot.reply_to(message, "sorry, gotcha problems :(")
+                    print(e)
 
         def send_random_photo(message, theme_short_name):
             try:
@@ -138,18 +153,19 @@ class Command(BaseCommand):
 
         @bot.message_handler(content_types=['text'], commands=['game'])
         def handle_game(message):
-            try:
-                games = ['dice', 'bowling', 'dart', 'basketball', 'football', 'slot machine']
-                callback = ['dice', 'bowling', 'dart', 'basketball', 'football', 'slot_machine']
-                markup = types.InlineKeyboardMarkup()
-                for i in range(len(games)):
-                    markup.add(
-                        types.InlineKeyboardButton(text=games[i], callback_data=callback[i]))
-                bot.send_message(message.chat.id, 'chooooose game! 🎮', reply_markup=markup)
+            if check_user(message):
+                try:
+                    games = ['dice', 'bowling', 'dart', 'basketball', 'football', 'slot machine']
+                    callback = ['dice', 'bowling', 'dart', 'basketball', 'football', 'slot_machine']
+                    markup = types.InlineKeyboardMarkup()
+                    for i in range(len(games)):
+                        markup.add(
+                            types.InlineKeyboardButton(text=games[i], callback_data=callback[i]))
+                    bot.send_message(message.chat.id, 'chooooose game! 🎮', reply_markup=markup)
 
-            except Exception as e:
-                bot.reply_to(message, "sorry, gotcha problems :(")
-                print(e)
+                except Exception as e:
+                    bot.reply_to(message, "sorry, gotcha problems :(")
+                    print(e)
 
         @bot.message_handler(content_types=['photo'])
         def handle_photo(message):
@@ -162,14 +178,15 @@ class Command(BaseCommand):
 
         @bot.message_handler(content_types=['text'], commands=['weather'])
         def handle_weather(message):
-            try:
-                markup = types.InlineKeyboardMarkup()
-                markup.add(types.InlineKeyboardButton(text='by city name 🏙', callback_data='get_weather_city'))
-                markup.add(types.InlineKeyboardButton(text='with map 🗺', callback_data='get_weather_map'))
-                bot.send_message(message.chat.id, text='okay! but firstly choose type of info you send me!', reply_markup=markup)
-            except Exception as e:
-                bot.reply_to(message, "sorry, gotcha problems :(")
-                print(e)
+            if check_user(message):
+                try:
+                    markup = types.InlineKeyboardMarkup()
+                    markup.add(types.InlineKeyboardButton(text='by city name 🏙', callback_data='get_weather_city'))
+                    markup.add(types.InlineKeyboardButton(text='with map 🗺', callback_data='get_weather_map'))
+                    bot.send_message(message.chat.id, text='okay! but firstly choose type of info you send me!', reply_markup=markup)
+                except Exception as e:
+                    bot.reply_to(message, "sorry, gotcha problems :(")
+                    print(e)
 
         def get_weather(message, type):
             try:
@@ -245,15 +262,16 @@ class Command(BaseCommand):
 
         @bot.message_handler(content_types=['text'], commands=['manage_themes'])
         def handle_manage_themes(message):
-            user = User.objects.get(telegram_id=message.chat.id)
-            if user.is_logged == 1:
-                markup = types.InlineKeyboardMarkup()
-                markup.add(types.InlineKeyboardButton(text='✅ add theme', callback_data='add_theme'))
-                markup.add(types.InlineKeyboardButton(text='🚫 delete theme', callback_data='delete_theme'))
-                msg = bot.send_message(message.chat.id, text="aight! what you want?", reply_markup=markup)
+            if check_user(message):
+                user = User.objects.get(telegram_id=message.chat.id)
+                if user.is_logged == 1:
+                    markup = types.InlineKeyboardMarkup()
+                    markup.add(types.InlineKeyboardButton(text='✅ add theme', callback_data='add_theme'))
+                    markup.add(types.InlineKeyboardButton(text='🚫 delete theme', callback_data='delete_theme'))
+                    msg = bot.send_message(message.chat.id, text="aight! what you want?", reply_markup=markup)
 
-            else:
-                bot.send_message(message.chat.id, text="sorry, you dont have access to it :<")
+                else:
+                    bot.send_message(message.chat.id, text="sorry, you dont have access to it :<")
 
         def get_new_theme(message):
             try:
@@ -316,13 +334,13 @@ class Command(BaseCommand):
 
         @bot.message_handler(content_types=['text'], commands=['schedule'])
         def handle_schedule(message):
-            try:
-
-                markup = make_schedule_markup()
-                bot.send_message(message.chat.id, text='well, what you looking for?', reply_markup=markup)
-            except Exception as e:
-                bot.reply_to(message, "sorry, gotcha problems :(")
-                print(e)
+            if check_user(message):
+                try:
+                    markup = make_schedule_markup()
+                    bot.send_message(message.chat.id, text='well, what you looking for?', reply_markup=markup)
+                except Exception as e:
+                    bot.reply_to(message, "sorry, gotcha problems :(")
+                    print(e)
 
         week_markup = types.InlineKeyboardMarkup(row_width=1)
         week_markup.row(types.InlineKeyboardButton(text='monday', callback_data='week_schedule_monday'),
@@ -410,16 +428,17 @@ class Command(BaseCommand):
 
         @bot.message_handler(content_types=['text'], commands=['manage_locations'])
         def handle_manage_locations(message):
-            try:
-                markup = types.InlineKeyboardMarkup()
-                markup.add(types.InlineKeyboardButton(text='✅ add location', callback_data='add_location'))
-                markup.add(types.InlineKeyboardButton(text='🚫 delete location', callback_data='delete_location'))
-                markup.add(types.InlineKeyboardButton(text='✍ edit location name', callback_data='edit_location'))
-                bot.send_message(message.chat.id, text='okay! choose the option!', reply_markup=markup)
+            if check_user(message):
+                try:
+                    markup = types.InlineKeyboardMarkup()
+                    markup.add(types.InlineKeyboardButton(text='✅ add location', callback_data='add_location'))
+                    markup.add(types.InlineKeyboardButton(text='🚫 delete location', callback_data='delete_location'))
+                    markup.add(types.InlineKeyboardButton(text='✍ edit location name', callback_data='edit_location'))
+                    bot.send_message(message.chat.id, text='okay! choose the option!', reply_markup=markup)
 
-            except Exception as e:
-                bot.reply_to(message, "sorry, gotcha problems :(")
-                print(e)
+                except Exception as e:
+                    bot.reply_to(message, "sorry, gotcha problems :(")
+                    print(e)
 
         def save_location(message):
             try:
@@ -519,49 +538,52 @@ class Command(BaseCommand):
                 print(e)
         @bot.message_handler(content_types=['text'], commands=['favourite_locations'])
         def handle_favourite_locations(message):
-            try:
-                markup = types.InlineKeyboardMarkup(row_width=1)
-                user = User.objects.get(telegram_id=message.chat.id)
-                fav_locations = FavLocation.objects.filter(user_id=user.id)
-                if len(fav_locations) == 0:
-                    bot.send_message(message.chat.id, text='you didnt add any location yet :<')
-                    return
-                for location in fav_locations:
-                    markup.add(types.InlineKeyboardButton(text=f'{location.name.replace("+", " ")}', callback_data=f'get_fav_location_{location.id}_by_{user.id}'))
-                bot.send_message(message.chat.id, text='here are all your locations!', reply_markup=markup)
-            except Exception as e:
-                bot.reply_to(message, "sorry, gotcha problems :(")
-                print(e)
+            if check_user(message):
+                try:
+                    markup = types.InlineKeyboardMarkup(row_width=1)
+                    user = User.objects.get(telegram_id=message.chat.id)
+                    fav_locations = FavLocation.objects.filter(user_id=user.id)
+                    if len(fav_locations) == 0:
+                        bot.send_message(message.chat.id, text='you didnt add any location yet :<')
+                        return
+                    for location in fav_locations:
+                        markup.add(types.InlineKeyboardButton(text=f'{location.name.replace("+", " ")}', callback_data=f'get_fav_location_{location.id}_by_{user.id}'))
+                    bot.send_message(message.chat.id, text='here are all your locations!', reply_markup=markup)
+                except Exception as e:
+                    bot.reply_to(message, "sorry, gotcha problems :(")
+                    print(e)
 
         @bot.message_handler(content_types=['text'], commands=['show_users'])
         def handle_show_users(message):
-            try:
-                user = User.objects.get(telegram_id=message.chat.id)
-                if user.is_logged:
-                    users = User.objects.all()
-                    msg = ''
-                    for local_user in users:
-                        msg = msg + f"{local_user.first_name} {local_user.last_name} (tg id: {local_user.telegram_id}, logged in: {local_user.is_logged})\n"
-                        fav_locations = FavLocation.objects.filter(user_id=local_user.id)
-                        msg = msg + f'num of fav location: {len(fav_locations)}\n'
-                        for location in fav_locations:
-                            msg = msg + f'   name: <b>{location.name}</b>, long: {location.longitude}, lat: {location.latitude}\n'
-                        schedule = Schedule.objects.filter(user_id=local_user.id)
-                        msg = msg + f"num of schedule fields: {len(schedule)}\n\n"
-                    bot.send_message(message.chat.id, text=msg, parse_mode='html')
-                else:
-                    bot.send_message(message.chat.id, text="sry, bro, you don't have access :<")
-            except Exception as e:
-                bot.reply_to(message, "sorry, gotcha problems :(")
-                print(e)
+            if check_user(message):
+                try:
+                    user = User.objects.get(telegram_id=message.chat.id)
+                    if user.is_logged:
+                        users = User.objects.all()
+                        msg = ''
+                        for local_user in users:
+                            msg = msg + f"{local_user.first_name} {local_user.last_name} (tg id: {local_user.telegram_id}, logged in: {local_user.is_logged})\n"
+                            fav_locations = FavLocation.objects.filter(user_id=local_user.id)
+                            msg = msg + f'num of fav location: {len(fav_locations)}\n'
+                            for location in fav_locations:
+                                msg = msg + f'   name: <b>{location.name}</b>, long: {location.longitude}, lat: {location.latitude}\n'
+                            schedule = Schedule.objects.filter(user_id=local_user.id)
+                            msg = msg + f"num of schedule fields: {len(schedule)}\n\n"
+                        bot.send_message(message.chat.id, text=msg, parse_mode='html')
+                    else:
+                        bot.send_message(message.chat.id, text="sry, bro, you don't have access :<")
+                except Exception as e:
+                    bot.reply_to(message, "sorry, gotcha problems :(")
+                    print(e)
 
         @bot.message_handler(content_types=['text'], commands=['id'])
         def handle_id(message):
-            try:
-                bot.send_message(message.chat.id, text=f"your tg id: {message.chat.id}")
-            except Exception as e:
-                bot.reply_to(message, "sorry, gotcha problems :(")
-                print(e)
+            if check_user(message):
+                try:
+                    bot.send_message(message.chat.id, text=f"your tg id: {message.chat.id}")
+                except Exception as e:
+                    bot.reply_to(message, "sorry, gotcha problems :(")
+                    print(e)
 
         @bot.callback_query_handler(func=lambda call: True)
         def callback_query(call):
