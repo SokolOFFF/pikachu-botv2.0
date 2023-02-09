@@ -21,8 +21,23 @@ class Command(BaseCommand):
         def check_user(message):
             user = User.objects.filter(telegram_id=message.chat.id)
             if user:
+                last_name = ''
+                first_name = ''
+                if message.from_user.last_name:
+                    last_name = message.from_user.last_name
+
+                if message.from_user.first_name:
+                    first_name = message.from_user.first_name
+
+                if first_name != user[0].first_name or last_name != user[0].last_name:
+                    user[0].last_name = last_name
+                    user[0].first_name = first_name
+                    user[0].save()
+                    print('updated info')
+
                 return 1
             else:
+                print('undef user')
                 bot.send_message(message.chat.id, text='please, text /start to use bot')
                 return 0
         @bot.message_handler(content_types=['text'], commands=['start', 'help'])
