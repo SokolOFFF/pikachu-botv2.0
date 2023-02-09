@@ -25,7 +25,16 @@ class Command(BaseCommand):
                 bot.send_message(message.chat.id,
                                  text="hi, {0.first_name}!\ni'm <b>{1.first_name}</b>, and i'm <b>Picture Bot</b> (but i have some other features). \ni hope i can help you somehow. ❤️".format(
                                      message.from_user, bot.get_me()), parse_mode='HTML')
-                user = User.objects.get_or_create(telegram_id=message.chat.id, first_name=message.from_user.first_name, last_name=message.from_user.last_name)
+                last_name = ''
+                first_name = ''
+
+                if message.from_user.last_name:
+                    last_name = message.from_user.last_name
+
+                if message.from_user.first_name:
+                    first_name = message.from_user.first_name
+
+                user = User.objects.get_or_create(telegram_id=message.chat.id, first_name=first_name, last_name=last_name)
 
             if message.text == "/help":
                 bot.send_sticker(message.chat.id, sticker=SECRETS.help_sticker)
@@ -418,7 +427,7 @@ class Command(BaseCommand):
                 locations = FavLocation.objects.filter(user_id=user.id)
                 if len(locations) >= config.MAX_LOCATION_CAPACITY:
                     bot.send_message(message.chat.id, text='sorry, mate, too much locations :<')
-                    return 
+                    return
                 keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
                 button_geo = types.KeyboardButton(text="send location!", request_location=True)
                 keyboard.add(button_geo)
